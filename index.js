@@ -7,11 +7,37 @@ const bcrypt = require('bcryptjs')
 
 const Event = require('./models/event');
 const User = require('./models/user');
-const { use } = require('express/lib/application');
+
 
 const app = express();
 
 app.use(bodyParser.json());
+
+const events = eventIds => {
+    return Event.find({ _id: { $in: eventIds } })
+        .then(events => {
+            return events.map(event => {
+                return {
+                    ...event._doc,
+                    _id: event.id,
+                    creator: user.bind(this, event.creator)
+                }
+            })
+        })
+        .catch(err => {
+            throw err
+        })
+}
+
+const user = userId => {
+    return User.findById(userId)
+        .then(user => {
+            return { ...user._doc, _id: user.id, createdEvents: events.bind(this, user._doc.createdEvents) }
+        })
+        .catch(err => {
+            throw err
+        })
+}
 
 app.use(
     '/graphql',
@@ -21,6 +47,7 @@ app.use(
             _id: ID!
             email: String!
             password: String
+            createdEvents: [Event!]
         }
 
         input UserInput {
@@ -34,6 +61,7 @@ app.use(
           description: String!
           price: Float!
           date: String!
+          creator: User!
         }
 
         input EventInput {
@@ -63,7 +91,12 @@ app.use(
                 return Event.find()
                     .then(events => {
                         return events.map(event => {
-                            return { ...event._doc, _id: event.id };
+                            return {
+                                ...event._doc,
+                                _id: event.id,
+                                creator: user.bind(this, event._doc.creator) // a function, user, that has event._doc.creator as the id passed as arg
+                                // should be same as creator: () => user(event._doc.creator)
+                            };
                         });
                     })
                     .catch(err => {
@@ -83,9 +116,10 @@ app.use(
                     .save()
                     .then(result => {
                         createdEvent = { ...result._doc, _id: result._doc._id.toString() };
-                        return User.findById('61d8642255e88898dac22b19')})
+                        return User.findById('61d8642255e88898dac22b19')
+                    })
                     .then(user => {
-                        if (!user){
+                        if (!user) {
                             throw new Error('User does not exist')
                         }
                         user.createdEvents.push(event)
